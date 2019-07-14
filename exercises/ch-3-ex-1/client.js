@@ -51,11 +51,45 @@ app.get('/authorize', function(req, res){
   res.redirect(authorizeUrl);
 });
 
+/*
+ * 認可コードを受け取ったあとのリダイレクト先
+ * トークンエンドポイントからアクセストークンを受け取る
+ */
 app.get('/callback', function(req, res){
+  // 認可エンドポイントが発行した認可コード
+  var code = req.query.code;
 
-	/*
-	 * Parse the response from the authorization server and get a token
-	 */
+  // トークンエンドポイント用のクエリストリングの組み立て
+  var form_data = qs.stringify({
+    grant_type: 'authorization_code',       // 認可コードによる認証を使う
+    code: code,                             // 認可コード
+    redirect_uri: client.redirect_uris[0]   // 認可コード取得時に使ったコールバックURL
+  })
+
+  // リクエストヘッダの組み立て
+  var headers = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Authorization': 'Basic ' + encodeClientCredentials(client.client_id, client.client_secret)
+  }
+
+  // トークンエンドポイントにPOSTする
+  var tokRes = request('POST', authServer.tokenEndpoint, {
+    body: form_data,
+    headers: headers
+  });
+
+  // POSTに成功した場合、アクセストークンを設定してトップページに戻る
+  if (tokRes.statusCode >= 200 && tokRes.statusCode < 300) {
+    var body = JSON.parse(tokRes.getBody());
+    console.log(body)
+    access_token = body.access_token;
+    scope = body.scope;
+    res.render('index', {access_token: access_token, scope: scope});
+  }
+  // POSTに失敗した場合、エラーページをレンダリング
+  else {
+    res.render('error', {error: 'Unable to fetch access token, server response: ' + tokRes.statusCode})
+  }
 
 });
 
