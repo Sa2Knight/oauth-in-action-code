@@ -1,3 +1,7 @@
+# fork概要
+
+OAuth2徹底入門のハンズオン用にforkした個人用リポジトリです。
+
 # OAuth 2 in Action
 
 ![Cover of OAuth 2 in Action](https://images.manning.com/255/340/resize/book/e/14336f9-6493-46dc-938c-11a34c9d20ac/Richer-OAuth2-HI.png)
