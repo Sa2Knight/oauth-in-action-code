@@ -43,10 +43,13 @@ app.get('/', function (req, res) {
  * 認可コード取得後は、callbackURLにリダイレクトしてもらう
  */
 app.get('/authorize', function(req, res){
+  // ランダム文字列を生成して、サーバ経由のリダイレクトであることを保証する
+  var state = randomstring.generate()
   var authorizeUrl = buildUrl(authServer.authorizationEndpoint, {
     response_type: 'code',
     client_id: client.client_id,
-    redirect_uri: client.redirect_uris[0]
+    redirect_uri: client.redirect_uris[0],
+    state: state
   });
   res.redirect(authorizeUrl);
 });
