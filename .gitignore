@@ -1,4 +1,5 @@
 *.swp
+package.json
 package-lock.json
 database.nosql
 example/native-client/platforms/
