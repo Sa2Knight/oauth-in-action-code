@@ -134,23 +134,54 @@ app.get('/fetch_resource', function(req, res) {
     res.render('data', {resource: body});
     return;
   }
-  // POST失敗時、リフレッシュトークンを用いてアクセストークンを再取得する
+  // POST失敗時、アクセストークンの再取得を実行
   else {
-    /*
-     * Instead of always returning an error like we do here, refresh the access token if we have a refresh token
-     */
-    console.log("resource status error code " + resource.statusCode);
-    res.render('error', {error: 'Unable to fetch resource. Status ' + resource.statusCode});
+    access_token = null; // 既存のアクセストークンは破棄しちゃう
+    if (refresh_token) {
+      refreshAccessToken(req, res);
+      return;
+    } else {
+      res.render('error', { error: resource.statusCode }); // リフレッシュトークンもなかったら諦めろ
+    }
   }
 });
 
+/*
+ * リフレッシュトークンを用いてアクセストークンを再取得する
+ */
 var refreshAccessToken = function(req, res) {
-
-  /*
-   * Use the refresh token to get a new access token
-   */
-
+  // 認可サーバにアクセストークンのリフレッシュを依頼
+  var tokRes = request('POST', authServer.tokenEndpoint, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Basic ' + encodeClientCredentials(client.client_id, client.client_secret)
+    },
+    body: qs.stringify({
+      grant_type: 'refresh_token',
+      refresh_token: refresh_token
+    })
+  });
+  // リフレッシュ成功時、アクセストークンを更新して、再度保護対象リソースを取得する
+  if (tokRes.statusCode >= 200 && tokRes.statusCode < 300) {
+    var body = JSON.parse(tokRes.getBody());
+    if (body.refresh_token) {
+      access_token = body.access_token
+      res.redirect('/fetch_resource')
+    } else {
+      renderUnableRefreshTokenError()
+    }
+  }
+  // リフレッシュ失敗時はそのリフレッシュトークンも捨てる
+  else {
+    renderUnableRefreshTokenError()
+  }
 };
+
+var renderUnableRefreshTokenError = function() {
+  refresh_token = null
+  res.render('error', { error: 'Unable to refresh token.' });
+  return;
+}
 
 var buildUrl = function(base, options, hash) {
   var newUrl = url.parse(base, true);
