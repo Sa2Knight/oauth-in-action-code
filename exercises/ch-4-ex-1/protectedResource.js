@@ -27,6 +27,7 @@ var resource = {
 
 /*
  * リクエストからアクセストークンを取り出すヘルパー関数
+ * 取り出したアクセストークンが有効かも評価する
  */
 var getAccessToken = function(req, res, next) {
   var inToken = null;
@@ -45,15 +46,29 @@ var getAccessToken = function(req, res, next) {
     inToken = req.query.access_token;
   }
 
+  // 抽出したアクセストークンをトークンデータベースと照合する
+  // 正常なトークンだった場合、リクエストオブジェクトに追加する
+  nosql.one(function(token) {
+    if (token.access_token == inToken) {
+      return token;
+    }
+  }, function(err, token) {
+    if (token) {
+      console.log("このトークンは正当やで %s", inToken);
+    } else {
+      console.log("このトークン不正やで %s", inToken);
+    }
+    req.access_token = token;
+    next();
+    return;
+  });
+
   return inToken;
 };
 
 app.options('/resource', cors());
 
 
-/*
- * Add the getAccessToken function to this handler
- */
 app.post("/resource", cors(), function(req, res){
 
   /*
