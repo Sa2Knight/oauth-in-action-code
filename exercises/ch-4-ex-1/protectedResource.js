@@ -59,22 +59,23 @@ var getAccessToken = function(req, res, next) {
       console.log("このトークン不正やで %s", inToken);
     }
     req.access_token = token;
-    next();
+    next(); // 次のミドルウェアのコールバック
     return;
   });
-
-  return inToken;
 };
 
 app.options('/resource', cors());
 
-
-app.post("/resource", cors(), function(req, res){
-
-  /*
-   * Check to see if the access token was found or not
-   */
-
+/*
+ * 保護対象リソースの取得エンドポイント
+ * 事前にアクセストークンを検証し、有効な場合のみ保護対象リソースを返却
+ */
+app.post("/resource", cors(), getAccessToken, function(req, res){
+  if (req.access_token) {
+    res.json(resource);
+  } else {
+    res.status(401).end();
+  }
 });
 
 var server = app.listen(9002, 'localhost', function () {
