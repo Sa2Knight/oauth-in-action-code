@@ -17,16 +17,35 @@ app.set('json spaces', 4);
 app.use('/', express.static('files/protectedResource'));
 app.use(cors());
 
+/*
+ * アクセストークンを持ったクライアントにだけ見せて良い情報
+ */
 var resource = {
   "name": "Protected Resource",
   "description": "This data has been protected by OAuth 2.0"
 };
 
+/*
+ * リクエストからアクセストークンを取り出すヘルパー関数
+ */
 var getAccessToken = function(req, res, next) {
-  /*
-   * Scan for an access token on the incoming request.
-   */
+  var inToken = null;
+  var auth = req.headers['authorization'];
 
+  // パターン1: authorizationヘッダーにトークンが含まれている場合
+  if (auth && auth.toLowerCase().indexOf('bearer') == 0) {
+    inToken = auth.slice('bearer '.length);
+  }
+  // パターン2: リクエストボディにフォームエンコードされたトークンが含まれている場合(非推奨)
+  else if (req.body && req.body.access_token) {
+    inToken = req.body.access_token;
+  }
+  // パターン3: クエリストリングにトークンが含まれている場合(非推奨)
+  else if (req.query && req.query.access_token) {
+    inToken = req.query.access_token;
+  }
+
+  return inToken;
 };
 
 app.options('/resource', cors());
