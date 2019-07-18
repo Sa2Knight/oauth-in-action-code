@@ -31,7 +31,7 @@ var authServer = {
 var clients = [
   {
     "client_id": "oauth-client-1",
-    "client_secret": "oauth-client-secret1",
+    "client_secret": "oauth-client-secret-1",
     "redirect_urls": ["http://localhost:9000/callback"]
   }
 ];
@@ -72,7 +72,6 @@ app.get("/authorize", function(req, res){
   // 認可のためのセッション管理
   var reqid = randomstring.generate(8);
   requests[reqid] = req.query
-  console.log(requests)
 
   // ユーザに権限委譲の承認をさせるための画面を描画
   res.render('approve', { client: client, reqid: reqid });
@@ -119,12 +118,71 @@ app.post('/approve', function(req, res) {
   res.redirect(redirect_url);
 });
 
+/**
+ * トークンエンドポイント
+ * バックチャンネルで利用
+ */
 app.post("/token", function(req, res){
+  var auth = req.headers['authorization']
 
-  /*
-   * Process the request, issue an access token
-   */
+  // リクエストヘッダーにクレデンシャルが含まれてる場合の抽出
+  if (auth) {
+    var clientCredentials = decodeClientCredentials(auth);
+    var clientId = clientCredentials.id;
+    var clientSecret = clientCredentials.secret;
+  }
 
+  // リクエストボディにクレデンシャルが含まれてる場合の抽出
+  if (req.body.client_id) {
+    if (clientId) {
+      res.status(401).json({ error: 'クレデンシャル二重に送ってるよ' });
+    }
+
+    var clientId = req.body.client_id;
+    var clientSecret = req.body.client_secret;
+  }
+
+  // クレデンシャルをもとにクライアントを特定
+  var client = getClient(clientId);
+  if (!client) {
+    res.status(401).json({ error: 'クライアントが見つからんぞ' });
+    return;
+  }
+  if (client.client_secret != clientSecret) {
+    res.status(401).json({ error: '偽物では？' });
+    return;
+  }
+
+  // 認可コードによる付与方式しか実装してないので、そうでない場合エラー
+  if (req.body.grant_type != 'authorization_code') {
+    res.status(400).json({ error: '認可コードしか認めないよ' });
+    return;
+  }
+
+  // 認可コードが正しくない場合もエラー
+  var code = codes[req.body.code];
+  if (!code) {
+    res.status(400).json({ error: '認可コードが違うぞ' });
+    return;
+  }
+
+  // 認可コードと紐付いてるクライアントと一致してなくてもエラー
+  delete codes[req.body.code];
+  if (code.request.client_id != clientId) {
+    res.status(400).json({ error: '認可コードの持ち主ちゃうやん' });
+    return;
+  }
+
+  // 流石に信頼して、アクセストークンを発行して永続化
+  var access_token = randomstring.generate();
+  nosql.insert({ access_token: access_token, client_id: clientId });
+
+  // トークンとその使い方をクライアントに伝える
+  var token_response = {
+    access_token: access_token,
+    token_type: 'Bearer'
+  };
+  res.status(200).json(token_response);
 });
 
 app.get('/', function(req, res) {
@@ -147,6 +205,10 @@ var buildUrl = function(base, options, hash) {
   return url.format(newUrl);
 };
 
+
+/**
+ * Basic認証でエンコードされたクレデンシャルをデコードする
+ */
 var decodeClientCredentials = function(auth) {
   var clientCredentials = new Buffer(auth.slice('basic '.length), 'base64').toString().split(':');
   var clientId = querystring.unescape(clientCredentials[0]);
@@ -163,6 +225,5 @@ var server = app.listen(9001, 'localhost', function () {
   var host = server.address().address;
   var port = server.address().port;
 
-  console.log('OAuth Authorization Server is listening at http://%s:%s', host, port);
 });
 
