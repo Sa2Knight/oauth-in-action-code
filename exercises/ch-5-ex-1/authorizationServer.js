@@ -20,8 +20,8 @@ app.set('json spaces', 4);
 
 // authorization server information
 var authServer = {
-	authorizationEndpoint: 'http://localhost:9001/authorize',
-	tokenEndpoint: 'http://localhost:9001/token'
+  authorizationEndpoint: 'http://localhost:9001/authorize',
+  tokenEndpoint: 'http://localhost:9001/token'
 };
 
 // client information
@@ -37,58 +37,58 @@ var codes = {};
 var requests = {};
 
 var getClient = function(clientId) {
-	return __.find(clients, function(client) { return client.client_id == clientId; });
+  return __.find(clients, function(client) { return client.client_id == clientId; });
 };
 
 app.get('/', function(req, res) {
-	res.render('index', {clients: clients, authServer: authServer});
+  res.render('index', {clients: clients, authServer: authServer});
 });
 
 app.get("/authorize", function(req, res){
-	
-	/*
-	 * Process the request, validate the client, and send the user to the approval page
-	 */
-	
+
+  /*
+   * Process the request, validate the client, and send the user to the approval page
+   */
+
 });
 
 app.post('/approve', function(req, res) {
 
-	/*
-	 * Process the results of the approval page, authorize the client
-	 */
-	
+  /*
+   * Process the results of the approval page, authorize the client
+   */
+
 });
 
 app.post("/token", function(req, res){
 
-	/*
-	 * Process the request, issue an access token
-	 */
+  /*
+   * Process the request, issue an access token
+   */
 
 });
 
 var buildUrl = function(base, options, hash) {
-	var newUrl = url.parse(base, true);
-	delete newUrl.search;
-	if (!newUrl.query) {
-		newUrl.query = {};
-	}
-	__.each(options, function(value, key, list) {
-		newUrl.query[key] = value;
-	});
-	if (hash) {
-		newUrl.hash = hash;
-	}
-	
-	return url.format(newUrl);
+  var newUrl = url.parse(base, true);
+  delete newUrl.search;
+  if (!newUrl.query) {
+    newUrl.query = {};
+  }
+  __.each(options, function(value, key, list) {
+    newUrl.query[key] = value;
+  });
+  if (hash) {
+    newUrl.hash = hash;
+  }
+
+  return url.format(newUrl);
 };
 
 var decodeClientCredentials = function(auth) {
-	var clientCredentials = new Buffer(auth.slice('basic '.length), 'base64').toString().split(':');
-	var clientId = querystring.unescape(clientCredentials[0]);
-	var clientSecret = querystring.unescape(clientCredentials[1]);	
-	return { id: clientId, secret: clientSecret };
+  var clientCredentials = new Buffer(auth.slice('basic '.length), 'base64').toString().split(':');
+  var clientId = querystring.unescape(clientCredentials[0]);
+  var clientSecret = querystring.unescape(clientCredentials[1]);
+  return { id: clientId, secret: clientSecret };
 };
 
 app.use('/', express.static('files/authorizationServer'));
@@ -102,4 +102,4 @@ var server = app.listen(9001, 'localhost', function () {
 
   console.log('OAuth Authorization Server is listening at http://%s:%s', host, port);
 });
- 
+
