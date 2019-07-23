@@ -153,36 +153,75 @@ app.post("/token", function(req, res){
     return;
   }
 
-  // 認可コードによる付与方式しか実装してないので、そうでない場合エラー
-  if (req.body.grant_type != 'authorization_code') {
-    res.status(400).json({ error: '認可コードしか認めないよ' });
-    return;
+  //
+  // 認可コードを使ってアクセストークンを取得する場合
+  //
+  if (req.body.grant_type == 'authorization_code') {
+
+    // 認可コードが正しくない場合もエラー
+    var code = codes[req.body.code];
+    if (!code) {
+      res.status(400).json({ error: '認可コードが違うぞ' });
+      return;
+    }
+
+    // 認可コードと紐付いてるクライアントと一致してなくてもエラー
+    delete codes[req.body.code];
+    if (code.request.client_id != clientId) {
+      res.status(400).json({ error: '認可コードの持ち主ちゃうやん' });
+      return;
+    }
+
+    // 流石に信頼して、アクセストークンを発行して永続化
+    var access_token = randomstring.generate();
+    nosql.insert({ access_token: access_token, client_id: clientId });
+
+    // アクセストークンとあわせてリフレッシュトークンも生成
+    var refresh_token = randomstring.generate();
+    nosql.insert({ refresh_token: refresh_token, client_id: clientId })
+
+    // トークンとその使い方をクライアントに伝える
+    var token_response = {
+      access_token: access_token,
+      refresh_token: refresh_token,
+      token_type: 'Bearer'
+    };
+    res.status(200).json(token_response);
   }
+  //
+  // リフレッシュトークンを使ってアクセストークンを取得する場合
+  //
+  else if (req.body.grant_type == 'refresh_token'){
+    // DBからリフレッシュトークンを検証する
+    nosql.one(function(token) {
+      if (token.refresh_token == req.body.refresh_token) {
+        return token;
+      }
+    }, function(err, token) {
+      if (token) {
+        // 合致したリフレッシュトークンと、クライアントクレデンシャルが合致しない場合、
+        // リフレッシュトークンが漏洩している可能性があるので削除する
+        if (token.client_id != clientId) {
+          nosql.remove(function(found) {
+            return (found == token)
+          }, function () {} );
+          res.status(400).json({error: 'リフレッシュトークンの持ち主じゃないやろ'});
+        }
 
-  // 認可コードが正しくない場合もエラー
-  var code = codes[req.body.code];
-  if (!code) {
-    res.status(400).json({ error: '認可コードが違うぞ' });
-    return;
+        // 正当なリフレッシュトークンと判断されたら、アクセストークンを再生成する
+        var access_token = randomstring.generate();
+        nosql.insert({ access_token: access_token, client_id: clientId });
+        var token_response = {
+          access_token: access_token,
+          refresh_token: refresh_token,
+          token_type: 'Bearer'
+        };
+        res.status(200).json(token_response);
+      } else {
+        res.status(400).json({error: 'リフレッシュトークンが見つからんぞ'});
+      }
+    });
   }
-
-  // 認可コードと紐付いてるクライアントと一致してなくてもエラー
-  delete codes[req.body.code];
-  if (code.request.client_id != clientId) {
-    res.status(400).json({ error: '認可コードの持ち主ちゃうやん' });
-    return;
-  }
-
-  // 流石に信頼して、アクセストークンを発行して永続化
-  var access_token = randomstring.generate();
-  nosql.insert({ access_token: access_token, client_id: clientId });
-
-  // トークンとその使い方をクライアントに伝える
-  var token_response = {
-    access_token: access_token,
-    token_type: 'Bearer'
-  };
-  res.status(200).json(token_response);
 });
 
 app.get('/', function(req, res) {
